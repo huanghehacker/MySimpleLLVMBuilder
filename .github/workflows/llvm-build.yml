@@ -1,11 +1,11 @@
-name: Build LLVM (Clang+LLD, Dynamic Link) - Termux
+name: Build LLVM (Obfuscator Dev, Dynamic) - Termux
 
 on:
   workflow_dispatch:
     inputs:
       ndk_version:
         description: "Android NDK Version"
-        default: 'r27c'
+        default: 'r30'
         required: true
 
 permissions:
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build:
-    name: Build Clang/LLD (Dynamic)
+    name: Build LLVM Full Toolchain (Dynamic)
     runs-on: ubuntu-24.04
     
     steps:
@@ -53,7 +53,7 @@ jobs:
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
-          key: llvm-clang-lld-dynamic-${{ inputs.ndk_version }}-${{ github.sha }}
+          key: llvm-obf-dev-${{ inputs.ndk_version }}-${{ github.sha }}
           max-size: 4G
 
       - name: Setup NDK
@@ -67,9 +67,7 @@ jobs:
         run: |
           mkdir -p build
           
-          # ==== 终极动态链接版 ====
-          # 核心改动: 开启 LLVM_BUILD_LLVM_DYLIB 和 CLANG_LINK_CLANG_DYLIB
-          # 这样会生成 libLLVM.so，保留所有完整的 API 符号供 Pass 使用。
+          # ==== OLLVM / 混淆开发终极配置 ====
           
           cmake -G Ninja -S llvm-project/llvm -B build \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
@@ -83,18 +81,26 @@ jobs:
             -DCMAKE_CXX_FLAGS="-g0" \
             -DCMAKE_MODULE_LINKER_FLAGS="-Wl,--unresolved-symbols=ignore-all" \
             -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--unresolved-symbols=ignore-all" \
+            -DCMAKE_INSTALL_RPATH="\$ORIGIN/../lib" \
+            -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
             \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_STANDARD=17 \
             -DLLVM_APPEND_VC_REV=ON \
             -DLLVM_TARGETS_TO_BUILD="AArch64" \
-            -DLLVM_ENABLE_PROJECTS="clang;lld" \
+            -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld;mlir;polly" \
             -DLLVM_INSTALL_UTILS=ON \
+            \
+            -DDEFAULT_SYSROOT="/data/data/com.termux/files/usr" \
+            -DLLVM_ENABLE_LIBXML2=OFF \
+            -DLLVM_ENABLE_TERMINFO=OFF \
             \
             -DLLVM_ENABLE_RTTI=ON \
             -DLLVM_ENABLE_LEGACY_PASS_MANAGER=ON \
+            -DLLVM_ENABLE_ASSERTIONS=ON \
+            -DLLVM_ENABLE_DUMP=ON \
             \
-            -DLLVM_ENABLE_BACKTRACES=OFF \
+            -DLLVM_ENABLE_BACKTRACES=ON \
             -DLLVM_BUILD_DOCS=OFF \
             -DLLVM_INCLUDE_TESTS=OFF \
             -DLLVM_BUILD_TESTS=OFF \
@@ -119,36 +125,40 @@ jobs:
       - name: Cleanup Artifacts
         run: |
           cd install_output
-          # 删除静态库(.a)节省空间，因为我们现在完全依赖动态库(.so)了
           find lib -name "*.a" -type f -delete 
           echo "Build finished. Final size:"
           du -sh .
 
       - name: Compress and Split
         run: |
-          tar -cf - -C install_output . | xz -9e -T0 | split -b 400M - "llvm-clang-lld.tar.xz."
-          ls -lh llvm-clang-lld.tar.xz.*
+          tar -cf - -C install_output . | xz -9e -T0 | split -b 400M - "llvm-obf-dev.tar.xz."
+          ls -lh llvm-obf-dev.tar.xz.*
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         if: success()
         with:
-          tag_name: llvm-clang-lld-dynamic-${{ github.run_number }}
-          name: LLVM Clang+LLD Build ${{ github.run_number }} (Dynamic Link)
+          tag_name: llvm-obf-dev-${{ github.run_number }}
+          name: LLVM Obfuscator Dev Build ${{ github.run_number }} (NDK r30)
           body: |
-            Streamlined, stable build of LLVM for Termux. 
-            Uses DYNAMIC LINKING (`libLLVM.so`) to guarantee 100% symbol availability for Pass plugins.
+            LLVM Toolchain specially configured for **Obfuscation Pass Development** in Termux.
             
-            **Configuration:**
-            - Build Type: `Release` (-g0)
-            - Projects: `clang`, `clang-tools-extra`, `lld`
-            - Features: `LLVM_ENABLE_RTTI=ON`, `LLVM_INSTALL_UTILS=ON`
-            - Linking: `LLVM_BUILD_LLVM_DYLIB=ON`, `CLANG_LINK_CLANG_DYLIB=ON`
+            **What's new for Pass Devs:**
+            - `LLVM_ENABLE_ASSERTIONS=ON`: Vital for debugging broken IR.
+            - `LLVM_ENABLE_DUMP=ON`: Enables `Value->dump()` for IR logging.
+            - `Polly`: Included for advanced polyhedral loop obfuscation.
+            - `clang-tools-extra`: Included for AST-level obfuscation.
+            - `MLIR` & `LLD` & `Clang`
+            
+            **Termux Quality of Life:**
+            - `\$ORIGIN/../lib` in RPATH (No `LD_LIBRARY_PATH` needed!).
+            - Built-in Termux Sysroot (No `ANDROID_NDK` env needed!).
+            - Dynamic Linked (`libLLVM.so`).
             
             **How to use:**
             Download all parts and run:
-            `cat llvm-clang-lld.tar.xz.* | tar -xJ`
+            `cat llvm-obf-dev.tar.xz.* | tar -xJ`
           files: |
-            llvm-clang-lld.tar.xz.*
+            llvm-obf-dev.tar.xz.*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

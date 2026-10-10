@@ -67,7 +67,8 @@ jobs:
         run: |
           mkdir -p build
           
-          # ==== OLLVM / 混淆开发终极配置 ====
+          # ==== 纯净版 OLLVM / 混淆开发终极配置 ====
+          # 去除了 DEFAULT_SYSROOT 和 RPATH 魔法，回归原汁原味
           
           cmake -G Ninja -S llvm-project/llvm -B build \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
@@ -81,8 +82,6 @@ jobs:
             -DCMAKE_CXX_FLAGS="-g0" \
             -DCMAKE_MODULE_LINKER_FLAGS="-Wl,--unresolved-symbols=ignore-all" \
             -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--unresolved-symbols=ignore-all" \
-            -DCMAKE_INSTALL_RPATH="\$ORIGIN/../lib" \
-            -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
             \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_STANDARD=17 \
@@ -90,10 +89,6 @@ jobs:
             -DLLVM_TARGETS_TO_BUILD="AArch64" \
             -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld;mlir;polly" \
             -DLLVM_INSTALL_UTILS=ON \
-            \
-            -DDEFAULT_SYSROOT="/data/data/com.termux/files/usr" \
-            -DLLVM_ENABLE_LIBXML2=OFF \
-            -DLLVM_ENABLE_TERMINFO=OFF \
             \
             -DLLVM_ENABLE_RTTI=ON \
             -DLLVM_ENABLE_LEGACY_PASS_MANAGER=ON \
@@ -139,9 +134,9 @@ jobs:
         if: success()
         with:
           tag_name: llvm-obf-dev-${{ github.run_number }}
-          name: LLVM Obfuscator Dev Build ${{ github.run_number }} (NDK r30)
+          name: LLVM Obfuscator Dev Build ${{ github.run_number }} (Pure NDK r30)
           body: |
-            LLVM Toolchain specially configured for **Obfuscation Pass Development** in Termux.
+            LLVM Toolchain configured for **Obfuscation Pass Development** in Termux.
             
             **What's new for Pass Devs:**
             - `LLVM_ENABLE_ASSERTIONS=ON`: Vital for debugging broken IR.
@@ -150,10 +145,8 @@ jobs:
             - `clang-tools-extra`: Included for AST-level obfuscation.
             - `MLIR` & `LLD` & `Clang`
             
-            **Termux Quality of Life:**
-            - `\$ORIGIN/../lib` in RPATH (No `LD_LIBRARY_PATH` needed!).
-            - Built-in Termux Sysroot (No `ANDROID_NDK` env needed!).
-            - Dynamic Linked (`libLLVM.so`).
+            **Note:**
+            This is a pure cross-compiled build. You **MUST** set `LD_LIBRARY_PATH` to point to the LLVM lib directory when running it in Termux.
             
             **How to use:**
             Download all parts and run:

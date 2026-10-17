@@ -80,8 +80,8 @@ jobs:
             \
             -DCMAKE_C_FLAGS="-g0" \
             -DCMAKE_CXX_FLAGS="-g0" \
-            -DCMAKE_MODULE_LINKER_FLAGS="-Wl" \
-            -DCMAKE_SHARED_LINKER_FLAGS="-Wl" \
+            -DCMAKE_MODULE_LINKER_FLAGS="-Wl,--unresolved-symbols=ignore-all" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--unresolved-symbols=ignore-all" \
             \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_STANDARD=17 \
@@ -92,8 +92,6 @@ jobs:
             \
             -DLLVM_ENABLE_RTTI=ON \
             -DLLVM_ENABLE_LEGACY_PASS_MANAGER=ON \
-            -DLLVM_ENABLE_ASSERTIONS=ON \
-            -DLLVM_ENABLE_DUMP=ON \
             \
             -DLLVM_ENABLE_BACKTRACES=ON \
             -DLLVM_BUILD_DOCS=OFF \
